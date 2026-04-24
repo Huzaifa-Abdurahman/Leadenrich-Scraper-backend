@@ -13,3 +13,4 @@ pydantic-settings==2.4.0
 pandas
 rich
 requests
+python-multipart==0.0.12
