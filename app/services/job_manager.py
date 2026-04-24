@@ -10,12 +10,15 @@ logger = logging.getLogger(__name__)
 # In-memory job store - only storage needed as per user request
 JOBS: Dict[str, Dict[str, Any]] = {}
 
-# Access Keys storage with persistence
+# Access Keys and Leads persistence
 KEYS: Dict[str, Dict[str, Any]] = {}
 KEYS_FILE = "keys.json"
+LEADS_FILE = "leads.json"
+VERIFICATION_CODES: Dict[str, Dict[str, Any]] = {}
 
 import json
 import os
+import random
 
 def load_keys():
     global KEYS
@@ -32,15 +35,48 @@ def save_keys():
     with open(KEYS_FILE, 'w') as f:
         json.dump(KEYS, f)
 
-def generate_access_key() -> str:
-    key = str(uuid.uuid4())[:8].upper()
-    KEYS[key] = {
-        "key": key,
-        "uses_left": 3,
-        "created_at": datetime.utcnow().isoformat()
+def save_lead(email: str):
+    leads = []
+    if os.path.exists(LEADS_FILE):
+        try:
+            with open(LEADS_FILE, 'r') as f:
+                leads = json.load(f)
+        except:
+            leads = []
+    
+    # Avoid duplicates
+    if not any(l['email'] == email for l in leads):
+        leads.append({
+            "email": email,
+            "captured_at": datetime.utcnow().isoformat()
+        })
+        with open(LEADS_FILE, 'w') as f:
+            json.dump(leads, f)
+
+def generate_verification_code(email: str) -> str:
+    code = "".join([str(random.randint(0, 9)) for _ in range(6)])
+    VERIFICATION_CODES[email] = {
+        "code": code,
+        "created_at": datetime.utcnow().timestamp()
     }
-    save_keys()
-    return key
+    return code
+
+def verify_code_and_generate_key(email: str, code: str) -> Optional[str]:
+    stored = VERIFICATION_CODES.get(email)
+    if stored and stored["code"] == code:
+        # Success - Save the lead and create a 3-trial key
+        save_lead(email)
+        key = str(uuid.uuid4())[:8].upper()
+        KEYS[key] = {
+            "key": key,
+            "email": email,
+            "uses_left": 3,
+            "created_at": datetime.utcnow().isoformat()
+        }
+        save_keys()
+        del VERIFICATION_CODES[email]
+        return key
+    return None
 
 def verify_key(key: str) -> bool:
     if key in KEYS and KEYS[key]["uses_left"] > 0:
@@ -104,7 +140,7 @@ async def _process_single_url(job_id: str, url: str):
                 "socials": d.get("social_profiles", []) or [],
                 "confidence": d.get("data_confidence", "low") or "low",
                 "score": 100 if d.get("data_confidence") == "high" else 75 if d.get("data_confidence") == "medium" else 40,
-                "description": f"Extracted via Firecrawl V2. Confidence: {d.get('data_confidence', 'N/A')}."
+                "description": f"Extracted via Agentic Selenium Engine. Confidence: {d.get('data_confidence', 'N/A')}."
             }
             
             job["results"].append(flattened)

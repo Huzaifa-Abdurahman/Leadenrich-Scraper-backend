@@ -1,6 +1,12 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from app.services.job_manager import generate_access_key, KEYS, verify_key
+from app.services.job_manager import (
+    KEYS, verify_key, generate_verification_code, 
+    verify_code_and_generate_key, LEADS_FILE
+)
+from app.services.email_service import email_service
+import json
+import os
 
 router = APIRouter(tags=["auth"])
 
@@ -11,24 +17,45 @@ class LoginRequest(BaseModel):
 class KeyVerifyRequest(BaseModel):
     key: str
 
+class EmailRequest(BaseModel):
+    email: str
+
+class VerifyRequest(BaseModel):
+    email: str
+    code: str
+
 @router.post("/admin/login")
 async def admin_login(request: LoginRequest):
     if request.username == "Huzaifa" and request.password == "100043155Hu":
         return {"success": True, "message": "Admin authenticated"}
     raise HTTPException(status_code=401, detail="Invalid credentials")
 
-@router.post("/admin/generate-key")
-async def generate_key(request: LoginRequest):
-    # Basic protection: check credentials every time for simplicity as requested
-    if request.username == "Huzaifa" and request.password == "100043155Hu":
-        new_key = generate_access_key()
-        return {"success": True, "key": new_key}
-    raise HTTPException(status_code=401, detail="Unauthorized")
+@router.get("/admin/leads")
+async def list_leads():
+    if os.path.exists(LEADS_FILE):
+        with open(LEADS_FILE, 'r') as f:
+            return json.load(f)
+    return []
 
-@router.get("/admin/keys")
-async def list_keys():
-    # In a real app, this should be protected too. For now, keeping it accessible for the admin UI.
-    return sorted(KEYS.values(), key=lambda x: x["created_at"], reverse=True)
+@router.post("/request-code")
+async def request_code(request: EmailRequest):
+    code = generate_verification_code(request.email)
+    print(f"\n🚀 [DEVELOPER MODE] Verification Code for {request.email}: {code}\n")
+    
+    success = email_service.send_verification_code(request.email, code)
+    
+    # Locally, we return success even if email fails so you can use the code from terminal
+    return {
+        "success": True, 
+        "message": "Code generated. Check terminal for local testing or email for production."
+    }
+
+@router.post("/verify-code")
+async def verify_code(request: VerifyRequest):
+    key = verify_code_and_generate_key(request.email, request.code)
+    if key:
+        return {"success": True, "key": key, "uses_left": 3}
+    return {"success": False, "message": "Invalid or expired verification code"}
 
 @router.post("/verify-key")
 async def check_key(request: KeyVerifyRequest):
