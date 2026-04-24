@@ -40,6 +40,9 @@ async def list_leads():
 @router.post("/request-code")
 async def request_code(request: EmailRequest):
     code = generate_verification_code(request.email)
+    if code is None:
+        return {"success": False, "message": "Maximum 3 extraction protocols reached for this email address. For more credits, contact us at +923100043155 (WhatsApp)."}
+        
     print(f"\n🚀 [DEVELOPER MODE] Verification Code for {request.email}: {code}\n")
     
     success = email_service.send_verification_code(request.email, code)

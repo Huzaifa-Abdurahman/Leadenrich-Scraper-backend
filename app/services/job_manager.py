@@ -35,6 +35,18 @@ def save_keys():
     with open(KEYS_FILE, 'w') as f:
         json.dump(KEYS, f)
 
+def get_lead_request_count(email: str) -> int:
+    if os.path.exists(LEADS_FILE):
+        try:
+            with open(LEADS_FILE, 'r') as f:
+                leads = json.load(f)
+                for l in leads:
+                    if l['email'] == email:
+                        return l.get('requests_count', 0)
+        except:
+            pass
+    return 0
+
 def save_lead(email: str):
     leads = []
     if os.path.exists(LEADS_FILE):
@@ -44,16 +56,29 @@ def save_lead(email: str):
         except:
             leads = []
     
-    # Avoid duplicates
-    if not any(l['email'] == email for l in leads):
+    found = False
+    for l in leads:
+        if l['email'] == email:
+            l['requests_count'] = l.get('requests_count', 0) + 1
+            l['last_captured_at'] = datetime.utcnow().isoformat()
+            found = True
+            break
+            
+    if not found:
         leads.append({
             "email": email,
-            "captured_at": datetime.utcnow().isoformat()
+            "captured_at": datetime.utcnow().isoformat(),
+            "requests_count": 1
         })
-        with open(LEADS_FILE, 'w') as f:
-            json.dump(leads, f)
+        
+    with open(LEADS_FILE, 'w') as f:
+        json.dump(leads, f)
 
-def generate_verification_code(email: str) -> str:
+def generate_verification_code(email: str) -> Optional[str]:
+    # Check limit: 3 times max
+    if get_lead_request_count(email) >= 3:
+        return None
+        
     code = "".join([str(random.randint(0, 9)) for _ in range(6)])
     VERIFICATION_CODES[email] = {
         "code": code,
