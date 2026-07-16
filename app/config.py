@@ -14,10 +14,6 @@ class Settings(BaseSettings):
     # CORS
     cors_origins: List[str] = ["*"]
 
-    # SMTP Settings for Lead Capture
-    smtp_email: str = ""
-    smtp_password: str = ""
-
     model_config = {
         "env_file": ".env", 
         "env_file_encoding": "utf-8",
