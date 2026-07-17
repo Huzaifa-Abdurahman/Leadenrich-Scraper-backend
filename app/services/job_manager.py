@@ -136,7 +136,7 @@ async def _process_single_url(job_id: str, url: str):
                 else 75
                 if d.get("data_confidence") == "medium"
                 else 40,
-                "description": f"Extracted via Agentic Selenium Engine. Confidence: {d.get('data_confidence', 'N/A')}.",
+                "description": f"Contact details collected from the company website. Confidence: {d.get('data_confidence', 'N/A')}.",
             }
 
             job["results"].append(flattened)

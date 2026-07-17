@@ -19,7 +19,7 @@ except ImportError:
     from routes import upload, auth
 
 # Initialize FastAPI
-app = FastAPI(title="LeadEnrich - Neural Extraction Engine")
+app = FastAPI(title="LeadEnrich - Contact Finder")
 
 
 # CORS support
